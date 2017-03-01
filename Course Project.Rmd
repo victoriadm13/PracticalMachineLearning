@@ -1,0 +1,165 @@
+---
+title: "Course Project - Practical Machine Learning"
+author: "Victoria Dotta"
+date: "28/2/2017"
+output: html_document
+---
+
+
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it.
+
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Objective
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+# Data 
+
+The training data for this project are available here:  
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv  
+
+The test data are available here:  
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv  
+
+The data for this project come from this source:   http://groupware.les.inf.puc-rio.br/har. 
+
+# Getting and cleaning the data
+
+## Getting the data
+
+```{R, results = "hide"}
+setwd("~/Documents/Coursera/Data Science Specialization/Practical Machine Learning/Archivos")
+
+trainURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(trainURL, destfile = "./train.csv", method = "curl")
+download.file(testURL, destfile = "./test.csv", method = "curl")
+
+train <- read.csv("train.csv", na.strings = c("NA", "#DIV/0!", ""))
+test <- read.csv("test.csv", na.strings = c("NA", "DIV/0!", ""))
+```
+
+## Cross validation
+
+I am goingo to create a "test" dataset in the training phase.
+
+```{R, results = "hide"}
+install.packages("caret", repos = "http://cran.us.r-project.org" , dependencies = TRUE)
+library(caret)
+
+set.seed(123)
+
+inTrain <- createDataPartition(y = train$classe, p = 0.6, list = FALSE)
+training <- train[inTrain,]
+testing <- train[-inTrain,]
+```
+
+```{R}
+dim(training)
+dim(testing)
+```
+
+## Cleaning the data
+
+I am going to remove the variables with nearly zero variance and variables with an 80% of the values as NA.
+
+```{R}
+# nearly zero variance variables
+
+nzv <- nearZeroVar(training)
+
+training <- training[,-nzv]
+testing <- testing[,-nzv]
+test <- test[, -nzv]
+
+# mostly NA variables
+
+na <- sapply(training, function(x) mean(is.na(x))) > 0.75
+
+training <- training[, na == FALSE]
+testing <- testing[, na == FALSE]
+test <- test[, na == FALSE]
+```
+
+Now, I am going to remove the first two columns, which have no interest for prediction.
+
+```{R}
+training <- training[,-c(1,2)]
+testing <- testing[,-c(1,2)]
+test <- test[,-c(1,2)]
+```
+
+# Decision tree model
+
+### The model:
+
+```{R}
+install.packages("rpart", repos = "http://cran.us.r-project.org")
+library(rpart)
+install.packages("rpart.plot", repos = "http://cran.us.r-project.org")
+library(rpart.plot)
+install.packages("rattle", repos = "http://cran.us.r-project.org")
+library(rattle)
+
+set.seed(580)
+
+DTmodel <- rpart(classe ~ ., method = "class", data = training) 
+rpart.plot(DTmodel, branch.lty=3, box.palette="RdYlGn" )
+
+```
+
+### Predictions:
+
+```{R}
+predictionsDT <- predict(DTmodel, testing, type = "class")
+confusionMatrix(predictionsDT, testing$classe)
+```
+
+
+# Random Forest Model
+
+### The model:
+
+```{R}
+install.packages("randomForest", repos = "http://cran.us.r-project.org" )
+library(randomForest)
+
+RFmodel <- randomForest(classe ~., data = training)
+```
+
+### Predictions:
+
+```{R}
+predictionsRF <- predict(RFmodel, testing, type = "class")
+confusionMatrix(predictionsRF, testing$classe)
+```
+
+## Conclusion
+
+The Random Forest Model have better results than the Decision Tree Model. 
+
+# Apply the model to the test set
+
+```{R}
+m <- head(training,1)
+m <- m[, -length(colnames(m))] 
+test1 <- test[, -length(colnames(test))] 
+test2 <- rbind(m, test1)
+test2 <- test2[-1,]
+prediction <- predict(RFmodel, test2, type = "class")
+prediction
+```
+
+
+
+
+
+
+
+
